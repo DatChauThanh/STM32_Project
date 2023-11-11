@@ -1,163 +1,118 @@
 
-
-/************** MAKE CHANGES HERE ********************/
-#include "stm32f1xx_hal.h"
-
-#define TYPE_DHT11    // define according to your sensor
-//#define TYPE_DHT22
-
-
-#define DHT_PORT GPIOA
-#define DHT_PIN GPIO_PIN_0
-
-
-
-
-/*******************************************     NO CHANGES AFTER THIS LINE      ****************************************************/
-
-uint8_t Rh_byte1, Rh_byte2, Temp_byte1, Temp_byte2;
-uint16_t SUM; uint8_t Presence = 0;
-
 #include "DHT.h"
 
-uint32_t DWT_Delay_Init(void)
+//************************** Low Level Layer ********************************************************//
+
+static void DHT_DelayInit(DHT_Name* DHT)
 {
-  /* Disable TRC */
-  CoreDebug->DEMCR &= ~CoreDebug_DEMCR_TRCENA_Msk; // ~0x01000000;
-  /* Enable TRC */
-  CoreDebug->DEMCR |=  CoreDebug_DEMCR_TRCENA_Msk; // 0x01000000;
-
-  /* Disable clock cycle counter */
-  DWT->CTRL &= ~DWT_CTRL_CYCCNTENA_Msk; //~0x00000001;
-  /* Enable  clock cycle counter */
-  DWT->CTRL |=  DWT_CTRL_CYCCNTENA_Msk; //0x00000001;
-
-  /* Reset the clock cycle counter value */
-  DWT->CYCCNT = 0;
-
-     /* 3 NO OPERATION instructions */
-     __ASM volatile ("NOP");
-     __ASM volatile ("NOP");
-  __ASM volatile ("NOP");
-
-  /* Check if clock cycle counter has started */
-     if(DWT->CYCCNT)
-     {
-       return 0; /*clock cycle counter started*/
-     }
-     else
-  {
-    return 1; /*clock cycle counter not started*/
-  }
+	DELAY_TIM_Init(DHT->Timer);
+}
+static void DHT_DelayUs(DHT_Name* DHT, uint16_t Time)
+{
+	DELAY_TIM_Us(DHT->Timer, Time);
 }
 
-__STATIC_INLINE void delay(volatile uint32_t microseconds)
-{
-  uint32_t clk_cycle_start = DWT->CYCCNT;
-
-  /* Go to number of cycles for system */
-  microseconds *= (HAL_RCC_GetHCLKFreq() / 1000000);
-
-  /* Delay till end */
-  while ((DWT->CYCCNT - clk_cycle_start) < microseconds);
-}
-
-void Set_Pin_Output (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
+static void DHT_SetPinOut(DHT_Name* DHT)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = GPIO_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
+	GPIO_InitStruct.Pin = DHT->Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DHT->PORT, &GPIO_InitStruct);
 }
-
-void Set_Pin_Input (GPIO_TypeDef *GPIOx, uint16_t GPIO_Pin)
+static void DHT_SetPinIn(DHT_Name* DHT)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = GPIO_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	GPIO_InitStruct.Pull = GPIO_NOPULL;
-	HAL_GPIO_Init(GPIOx, &GPIO_InitStruct);
+	GPIO_InitStruct.Pin = DHT->Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(DHT->PORT, &GPIO_InitStruct);
 }
-
-
-void DHT_Start (void)
+static void DHT_WritePin(DHT_Name* DHT, uint8_t Value)
 {
-	DWT_Delay_Init();
-	Set_Pin_Output (DHT_PORT, DHT_PIN);  // set the pin as output
-	HAL_GPIO_WritePin (DHT_PORT, DHT_PIN, 0);   // pull the pin low
-
-#if defined(TYPE_DHT11)
-	delay (18000);   // wait for 18ms
-#endif
-
-#if defined(TYPE_DHT22)
-	delay (1200);  // >1ms delay
-#endif
-
-    HAL_GPIO_WritePin (DHT_PORT, DHT_PIN, 1);   // pull the pin high
-    delay (20);   // wait for 30us
-	Set_Pin_Input(DHT_PORT, DHT_PIN);    // set as input
+	HAL_GPIO_WritePin(DHT->PORT, DHT->Pin, Value);
 }
-
-uint8_t DHT_Check_Response (void)
+static uint8_t DHT_ReadPin(DHT_Name* DHT)
 {
+	return HAL_GPIO_ReadPin(DHT->PORT, DHT->Pin);
+}
+//********************************* Middle level Layer ****************************************************//
+static uint8_t DHT_Start(DHT_Name* DHT)
+{
+	
 	uint8_t Response = 0;
-	delay (40);
-
-		if (!(HAL_GPIO_ReadPin (DHT_PORT, DHT_PIN)))
+	DHT_SetPinOut(DHT);  
+	DHT_WritePin(DHT, 0);
+	DHT_DelayUs(DHT, 20000);  
+	DHT_WritePin(DHT, 1);	
+	DHT_DelayUs(DHT, 30);
+	DHT_SetPinIn(DHT);    
+	DHT_DelayUs(DHT, 40); 
+	if (!DHT_ReadPin(DHT))
+	{
+		DHT_DelayUs(DHT, 80); 
+		if(DHT_ReadPin(DHT))
 		{
-			delay (80);
-			if ((HAL_GPIO_ReadPin (DHT_PORT, DHT_PIN))) Response = 1;
-			else Response = -1;
+			Response = 1;   
 		}
-
-	while ((HAL_GPIO_ReadPin (DHT_PORT, DHT_PIN)));   // wait for the pin to go low
+		else Response = 0;  
+	}		
+	while(DHT_ReadPin(DHT));
 
 	return Response;
 }
-
-uint8_t DHT_Read (void)
+static uint8_t DHT_Read(DHT_Name* DHT)
 {
-	uint8_t i,j;
-	for (j=0;j<8;j++)
+	uint8_t Value = 0;
+	DHT_SetPinIn(DHT);
+	for(int i = 0; i<8; i++)
 	{
-		while (!(HAL_GPIO_ReadPin (DHT_PORT, DHT_PIN)));   // wait for the pin to go high
-		delay (40);   // wait for 40 us
-		if (!(HAL_GPIO_ReadPin (DHT_PORT, DHT_PIN)))   // if the pin is low
+		while(!DHT_ReadPin(DHT));
+		DHT_DelayUs(DHT, 40);
+		if(!DHT_ReadPin(DHT))
 		{
-			i&= ~(1<<(7-j));   // write 0
+			Value &= ~(1<<(7-i));	
 		}
-		else i|= (1<<(7-j));  // if the pin is high, write 1
-		while ((HAL_GPIO_ReadPin (DHT_PORT, DHT_PIN)));  // wait for the pin to go low
+		else Value |= 1<<(7-i);
+		while(DHT_ReadPin(DHT));
 	}
-	return i;
+	return Value;
 }
 
-
-
-void DHT_GetData (DHT_DataTypedef *DHT_Data)
+//************************** High Level Layer ********************************************************//
+void DHT_Init(DHT_Name* DHT, uint8_t DHT_Type, TIM_HandleTypeDef* Timer, GPIO_TypeDef* DH_PORT, uint16_t DH_Pin)
 {
-    DHT_Start ();
-	Presence = DHT_Check_Response ();
-	Rh_byte1 = DHT_Read ();
-	Rh_byte2 = DHT_Read ();
-	Temp_byte1 = DHT_Read ();
-	Temp_byte2 = DHT_Read ();
-	SUM = DHT_Read();
-
-	if (SUM == (Rh_byte1+Rh_byte2+Temp_byte1+Temp_byte2))
+	if(DHT_Type == DHT11)
 	{
-		#if defined(TYPE_DHT11)
-			DHT_Data->Temperature = Temp_byte1;
-			DHT_Data->Humidity = Rh_byte1;
-		#endif
-
-		#if defined(TYPE_DHT22)
-			DHT_Data->Temperature = ((Temp_byte1<<8)|Temp_byte2);
-			DHT_Data->Humidity = ((Rh_byte1<<8)|Rh_byte2);
-		#endif
+		DHT->Type = DHT11_STARTTIME;
 	}
+	else if(DHT_Type == DHT22)
+	{
+		DHT->Type = DHT22_STARTTIME;
+	}
+	DHT->PORT = DH_PORT;
+	DHT->Pin = DH_Pin;
+	DHT->Timer = Timer;
+	DHT_DelayInit(DHT);
 }
 
+uint8_t DHT_ReadTempHum(DHT_Name* DHT)
+{
 
+	uint8_t Temp1, Temp2, RH1, RH2,SUM = 0;
+	DHT_Start(DHT);
+	RH1 = DHT_Read(DHT);
+	RH2 = DHT_Read(DHT);
+	Temp1 = DHT_Read(DHT);
+	Temp2 = DHT_Read(DHT);
+	SUM = DHT_Read(DHT);
+	if(SUM == RH1 + RH2 +Temp1+Temp2 )
+	{
+		DHT->Humi1= RH1;
+		DHT->Humi2 = RH2;
+		DHT->Temp1 = Temp1;
+		DHT->Temp2 = Temp2;
+		return DHT_OK;
+	}
+	return DHT_ERROR;
+}
