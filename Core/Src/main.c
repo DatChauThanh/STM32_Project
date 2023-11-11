@@ -96,7 +96,7 @@ SX1278_t SX1278;
 
 int master = 1;
 int ret;
-char buffer[16]="abcdef1234567890";
+char buffer[16]="1234561234567890";
 uint16_t Flame,MQ2;
 /* USER CODE END 0 */
 
@@ -182,8 +182,6 @@ int main(void)
 	  buffer[4]= (uint8_t)(MQ2>>8) ;
 
 	  if (master == 1) {
-
-		HAL_Delay(1000);
 
 
 		ret = SX1278_LoRaEntryTx(&SX1278, 16, 2000);
