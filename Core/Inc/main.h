@@ -69,6 +69,8 @@ void Error_Handler(void);
 #define DHT_GPIO_Port GPIOA
 #define Flame_Pin GPIO_PIN_3
 #define Flame_GPIO_Port GPIOB
+#define MQ2_Pin GPIO_PIN_5
+#define MQ2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

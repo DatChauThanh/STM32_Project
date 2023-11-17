@@ -73,7 +73,7 @@ void ADC_Select_CH0 (void)
 	  */
 	  sConfig.Channel = ADC_CHANNEL_0;
 	  sConfig.Rank = 1;
-	  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+	  sConfig.SamplingTime = ADC_SAMPLETIME_13CYCLES_5;
 	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
 	  {
 	    Error_Handler();
@@ -87,7 +87,7 @@ void ADC_Select_CH1 (void)
 	  */
 	  sConfig.Channel = ADC_CHANNEL_1;
 	  sConfig.Rank = 1;
-	  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+	  sConfig.SamplingTime = ADC_SAMPLETIME_13CYCLES_5;
 	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
 	  {
 	    Error_Handler();
@@ -173,11 +173,9 @@ int main(void)
   while (1)
   {
 	  DHT_ReadTempHum(&dht11);
-	  HAL_Delay(2000);
-	  buffer[5]= (uint8_t)dht11.Temp1 ;
-	  buffer[6]= (uint8_t)dht11.Humi1 ;
-
-
+	  HAL_Delay(1000);
+	  buffer[6]= (uint8_t)dht11.Temp1 ;
+	  buffer[7]= (uint8_t)dht11.Humi1 ;
 
 	  ADC_Select_CH0();
 	  HAL_ADC_Start(&hadc1);
@@ -197,6 +195,7 @@ int main(void)
 	  buffer[2]= HAL_GPIO_ReadPin(GPIOB, Flame_Pin);
 	  buffer[3]= (uint8_t)MQ2 ;
 	  buffer[4]= (uint8_t)(MQ2>>8) ;
+	  buffer[5]= HAL_GPIO_ReadPin(GPIOB, MQ2_Pin);
 
 	  if (master == 1) {
 
@@ -516,8 +515,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(RST_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DIO0_Pin Flame_Pin */
-  GPIO_InitStruct.Pin = DIO0_Pin|Flame_Pin;
+  /*Configure GPIO pins : DIO0_Pin Flame_Pin MQ2_Pin */
+  GPIO_InitStruct.Pin = DIO0_Pin|Flame_Pin|MQ2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
