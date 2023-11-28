@@ -2203,8 +2203,8 @@ void ADC_Select_CH0 (void)
 	  sConfig.Rank = 1;
  8001014:	2301      	movs	r3, #1
  8001016:	60bb      	str	r3, [r7, #8]
-	  sConfig.SamplingTime = ADC_SAMPLETIME_13CYCLES_5;
- 8001018:	2302      	movs	r3, #2
+	  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
+ 8001018:	2303      	movs	r3, #3
  800101a:	60fb      	str	r3, [r7, #12]
 	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
  800101c:	1d3b      	adds	r3, r7, #4
@@ -2246,8 +2246,8 @@ void ADC_Select_CH1 (void)
 	  sConfig.Rank = 1;
  8001050:	2301      	movs	r3, #1
  8001052:	60bb      	str	r3, [r7, #8]
-	  sConfig.SamplingTime = ADC_SAMPLETIME_13CYCLES_5;
- 8001054:	2302      	movs	r3, #2
+	  sConfig.SamplingTime = ADC_SAMPLETIME_28CYCLES_5;
+ 8001054:	2303      	movs	r3, #3
  8001056:	60fb      	str	r3, [r7, #12]
 	  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
  8001058:	1d3b      	adds	r3, r7, #4
